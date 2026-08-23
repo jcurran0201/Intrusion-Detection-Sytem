@@ -45,7 +45,7 @@ Each stage is a standalone module, so any step can be tested, swapped, or re-run
 | **Algorithm** | Random Forest |
 | **Dataset** | CIC-IDS network flow data |
 | **Classes** | 8 — Benign, Exploits, Fuzzers, Recon, Generic, DoS, Shellcode, Rare_Attack (a merged class combining Analysis, Backdoor, and Worms, which were individually too small to model reliably) |
-| **Performance** | Weighted F1 ≈ 0.889 |
+| **Performance** | Weighted F1 = 0.9068447876317772 |
 | **Preprocessing** | Variance filter → correlation filter → low-signal feature drop → train/test split → SMOTE (train only) → mutual information selection → log transform → RobustScaler |
 
 **Why Random Forest:** it matched more complex alternatives on weighted F1, which indicates the ceiling here is set by the data rather than model capacity — more model complexity wasn't going to buy much more accuracy, so the simpler, more interpretable model was the better choice.
