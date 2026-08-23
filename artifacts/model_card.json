@@ -1,0 +1,19 @@
+{
+  "model_name": "Random Forest",
+  "dataset": "UNSW-NB15 2024",
+  "weighted_f1": 0.9068447876317772,
+  "trained_at": "2026-08-22T19:32:13.817086",
+  "features": 20,
+  "smote_applied": true,
+  "scaler": "RobustScaler (inside pipeline)",
+  "classes": {
+    "0": "Benign",
+    "1": "Exploits",
+    "2": "Fuzzers",
+    "3": "Recon",
+    "4": "Generic",
+    "5": "DoS",
+    "6": "Shellcode",
+    "7": "Rare_Attack"
+  }
+}
