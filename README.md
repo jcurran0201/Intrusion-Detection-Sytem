@@ -103,13 +103,21 @@ Each scored flow is bucketed into a tier based on `attack_score` (P(not benign))
 ## Project structure
 
 ├── pcap_handler.py # validates PCAPs, writes to a stable temp path (pyshark)
+
 ├── feature_extraction.py # wraps CICFlowMeter, produces flow-level feature CSVs
+
 ├── cleaning.py # aligns extracted features to the trained schema
+
 ├── predict.py # loads model/scaler/label map, scores flows, assigns tiers
+
 ├── main.py # FastAPI layer exposing prediction endpoints
+
 └── artifacts/
+
 ├── model.pkl # trained Random Forest model
+
 ├── features.json # ordered feature list the model expects
+
 └── label_map.json # class index → attack label mapping
 
 
