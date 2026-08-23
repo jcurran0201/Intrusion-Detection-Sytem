@@ -8,23 +8,34 @@ This project is paired with a companion MS thesis, *ML-Based Intrusion Detection
 
 ## Architecture 
 PCAP file
+
 │
 ▼
+
 pcap_handler.py validates the capture (pyshark) and writes it to a stable temp path
 │
 ▼
+
 feature_extraction.py runs CICFlowMeter, converts raw packets into flow-level statistics
+
 │
 ▼
+
 cleaning.py aligns columns to the trained feature schema, strips Inf/NaN,
+
 │ fails loudly on missing features instead of silently misaligning
 ▼
+
 predict.py loads the trained Random Forest model + scaler, scores each flow,
+
 │ assigns an attack class and an alert tier (HIGH / MEDIUM / LOW)
 ▼
+
 FastAPI layer exposes prediction as an API
+
 │
 ▼
+
 Elasticsearch + Kibana alerts are ingested into an ids-alerts* index and visualized
 on a dashboard (alert tier breakdown, attack class distribution,
 attack score over time, HIGH-tier alert table)
