@@ -14,6 +14,7 @@ PCAP file
 ▼
 
 pcap_handler.py validates the capture (pyshark) and writes it to a stable temp path
+
 │
 
 ▼
