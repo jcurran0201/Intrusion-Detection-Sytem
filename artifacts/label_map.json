@@ -1,0 +1,10 @@
+{
+  "0": "Benign",
+  "1": "Exploits",
+  "2": "Fuzzers",
+  "3": "Recon",
+  "4": "Generic",
+  "5": "DoS",
+  "6": "Shellcode",
+  "7": "Rare_Attack"
+}
