@@ -33,13 +33,13 @@ from pipeline.feature_extraction import extract_flows
 from pipeline.cleaning import clean_cicflow_output
 from pipeline.predict import predict_flows, _load_artifacts
 
-# dirname(__file__) = api/, then ../artifacts → project_root/artifacts; works no matter where uvicorn is launched from
+# dirname(__file__) = api/, then ../artifacts → project_root/artifacts. Works no matter where uvicorn is launched from
 ARTIFACTS_BASE = os.path.join(os.path.dirname(__file__), "..", "artifacts")
-# Ordered training feature list; cleaning uses it so inference columns match training columns exactly
+# Ordered training feature list. Cleaning uses it so inference columns match training columns exactly
 FEATURES_PATH = os.path.join(ARTIFACTS_BASE, "features.json")
 
-#Elasticsearch config 
-# ES address from an env var, local default otherwise; in Docker/ECS you set ES_HOST without touching code
+#Elasticsearch configuration 
+# Elasticsearch address from an env var, local default otherwise; in Docker/ECS you set ES_HOST without touching code
 ES_HOST = os.environ.get("ES_HOST", "http://localhost:9200")   # same pattern as CICFLOWMETER_JAR
 # Index name (≈ a table) where alert documents land; Kibana's data view points at this
 ES_INDEX = os.environ.get("ES_INDEX", "ids-alerts")
@@ -48,7 +48,7 @@ ES_INDEX = os.environ.get("ES_INDEX", "ids-alerts")
 logger = logging.getLogger("ids.api")
 
 # live capture state
-# ⚠ Module-level globals = one capture per process; with multiple uvicorn workers each has its own copy
+# WARNING Module-level globals = one capture per process; with multiple uvicorn workers each has its own copy
 # Handle to the background capture task; /live/stop cancels it, /live/status checks .done()
 _live_task: asyncio.Task | None = None
 # Path of the temp PCAP the current capture is writing to
@@ -57,11 +57,11 @@ _live_pcap: str | None = None
 _live_result: list | None = None
 
 
-# Cached ES client, created lazily so a missing ES doesn't stop the app from starting
+# Cached Elasticsearch client, so a missing Elasticsearch doesn't stop the app from starting
 _es_client: Elasticsearch | None = None
 
-# Explicit index schema so ES doesn't guess types (a guessed "text" field breaks aggregations)
-# ⚠ No flow identifiers (Src/Dst IP, ports, protocol, Flow ID, flow time). alerts can't be traced to a host
+# Explicit index schema so Elasticsearch doesn't guess types (a guessed "text" field breaks aggregations)
+# WARNING No flow identifiers (Src/Dst IP, ports, protocol, Flow ID, flow time). Alerts can't be traced to a host
 ES_MAPPING = {
     "mappings": {
         "properties": {
@@ -82,7 +82,7 @@ ES_MAPPING = {
 }
 
 
-# Returns the cached ES client, connects if needed, or returns None if ES is unreachable
+# Returns the cached Elasticsearch client, connects if needed or returns None if Elasticsearch is unreachable
 def _get_es_client() -> Elasticsearch | None:
     """ create (and cache) the Elastic Search client. Returns None if Elastic Search is unreachable."""
     # Required because we assign to the module-level variable below
@@ -91,24 +91,24 @@ def _get_es_client() -> Elasticsearch | None:
     if _es_client is not None:
         return _es_client
     try:
-        # Build the client; each HTTP call capped at 3s (⚠ default retries multiply this)
+        # Build the client. Each HTTP call capped at 3s (WARNING default retries multiply this)
         client = Elasticsearch(ES_HOST, request_timeout=3)
-        # ping() returns False rather than raising when ES is down
+        # ping() returns False rather than raising when Elasticsearch is down
         if not client.ping():
             # Force a failure into the except branch
             raise ConnectionError(f"Ping failed for {ES_HOST}")
         # First run → index doesn't exist yet
         if not client.indices.exists(index=ES_INDEX):
-            # Create it with the explicit mapping (⚠ body= is deprecated in elasticsearch-py 8; use mappings=)
+            # Create it with the explicit mapping (WARNING body= is deprecated in elasticsearch-py 8; use mappings=)
             client.indices.create(index=ES_INDEX, body=ES_MAPPING)
         # Only cache once ping and index check both succeed
         _es_client = client
         return _es_client
     # Any connection problem lands here
     except Exception as e:
-        # Log it; nothing is cached, so the next call retries (⚠ every request pays the timeout while ES is down)
+        # Log it, nothing is cached, so the next call retries (WARNING every request pays the timeout while Elasticsearch is down)
         logger.warning(f"Elasticsearch unavailable at {ES_HOST}: {e}")
-        # Callers treat None as "skip ES"
+        # Callers treat None as "skip Elasticsearch"
         return None
 
 
@@ -117,7 +117,7 @@ def _get_es_client() -> Elasticsearch | None:
 async def lifespan(app: FastAPI):
     # warm the model cache on startup so the first request isn't slow
     _load_artifacts()
-    # warm the ES connection too; logs a warning if ES is down, doesn't crash startup
+    # warm the Elasticsearch connection too; logs a warning if Elasticsearch is down, doesn't crash startup
     _get_es_client()
     # Before yield = startup; app serves requests while paused here; after yield would be shutdown
     yield
@@ -155,7 +155,7 @@ def _run_pipeline(pcap_path: str) -> list[dict]:
 
 # Counts flows per alert tier for the response summary
 def _alert_summary(records: list[dict]) -> dict:
-    # Pull the tier out of each record (⚠ KeyError on an {"error": ...} record)
+    # Pull the tier out of each record (WARNING KeyError on an {"error": ...} record)
     tiers = [r["alert_tier"] for r in records]
     return {
         # Number of classified flows
@@ -167,7 +167,7 @@ def _alert_summary(records: list[dict]) -> dict:
     }
 
 
-# Sends prediction records to ES; never raises (⚠ synchronous, so it blocks the event loop when called from async routes)
+# Sends prediction records to Elasticsearch; never raises WARNING synchronous, so it blocks the event loop when called from async routes)
 def _ingest_to_es(records: list[dict], source: str) -> None:
     """
     Bulk-ingest prediction records into Elasticsearch.  Best-effort — logs and
@@ -177,15 +177,15 @@ def _ingest_to_es(records: list[dict], source: str) -> None:
     """
     # Cached client, or try to connect
     client = _get_es_client()
-    # ES down → log and bail; prediction response is unaffected
+    # Elasticsearch down → log and bail. Prediction response is unaffected
     if client is None:
-        logger.warning(f"Skipping ES ingestion for {len(records)} record(s) — ES unavailable.")
+        logger.warning(f"Skipping ES ingestion for {len(records)} record(s) — Elasticsearch unavailable.")
         return
 
-    # One UTC timestamp for the batch (⚠ ingestion time, not flow time; every flow in a batch gets the same value)
+    # One UTC timestamp for the batch (WARNING ingestion time, not flow time. Every flow in a batch gets the same value)
     now = datetime.now(timezone.utc)
 
-    # Generator yielding one ES action per record, so bulk() streams instead of building a big list
+    # Generator yielding one Elasticsearch action per record, so bulk() streams instead of building a big list
     def _docs():
         for r in records:
             yield {
@@ -225,7 +225,7 @@ def healthz():
     # Returns cached artifacts loaded at startup
     model, features, label_map = _load_artifacts()
     return {
-        # ⚠ Always "ok"; doesn't report ES connectivity
+        # WARNING Always "ok"; doesn't report Elasticsearch connectivity
         "status": "ok",
         # Should match the training feature count
         "model_features": len(features),
@@ -244,12 +244,12 @@ async def predict(file: UploadFile = File(...)):
 
     Requires CICFlowMeter to be installed (see pipeline/feature_extraction.py).
     """
-    # endswith takes a tuple → accepts either extension (⚠ AttributeError if filename is None)
+    # endswith takes a tuple → accepts either extension (WARNING AttributeError if filename is None)
     if not file.filename.endswith((".pcap", ".pcapng")):
         # 400 Bad Request — wrong file type
         raise HTTPException(400, "File must be a .pcap or .pcapng")
 
-    # Read whole upload into memory (⚠ no size limit)
+    # Read whole upload into memory (WARNING no size limit)
     raw_bytes = await file.read()
     # Reject empty uploads
     if len(raw_bytes) == 0:
@@ -261,7 +261,7 @@ async def predict(file: UploadFile = File(...)):
         # Disk write in a worker thread so other requests keep being served
         pcap_path = await asyncio.to_thread(save_pcap_bytes, raw_bytes)
         # Heavy CICFlowMeter + inference work, also in a thread
-        records   = await asyncio.to_thread(_run_pipeline, pcap_path)
+        records = await asyncio.to_thread(_run_pipeline, pcap_path)
     # CICFlowMeter missing
     except RuntimeError as e:
         # CICFlowMeter not installed — return a clear message instead of 500
@@ -307,22 +307,22 @@ async def predict_flows_endpoint(file: UploadFile = File(...)):
     if len(raw_bytes) == 0:
         raise HTTPException(400, "Uploaded file is empty.")
 
-    # ⚠ Everything in this try runs on the event loop (no to_thread) → a big CSV freezes other requests
+    # WARNING Everything in this try runs on the event loop (no to_thread) → a big CSV freezes other requests
     try:
         # BytesIO makes bytes look like a file → no temp file needed
-        raw_df   = pd.read_csv(io.BytesIO(raw_bytes))
+        raw_df = pd.read_csv(io.BytesIO(raw_bytes))
         # Same cleaning as the PCAP path → consistent features
         clean_df = clean_cicflow_output(raw_df, FEATURES_PATH)
         # Same model
-        pred_df  = predict_flows(clean_df)
+        pred_df = predict_flows(clean_df)
         # Output columns only, one dict per flow
-        records  = pred_df[
+        records = pred_df[
             ["attack_score", "pred_label", "alert_tier", "action"]
         ].to_dict(orient="records")
     # Missing/misaligned columns, etc.
     except ValueError as e:
         raise HTTPException(422, str(e))
-    # ⚠ Never reached: ParserError subclasses ValueError, so the branch above catches it first — swap the order
+    # WARNING Never reached: ParserError subclasses ValueError, so the branch above catches it first — swap the order
     except pd.errors.ParserError as e:
         raise HTTPException(422, f"Could not parse CSV: {e}")
 
@@ -372,7 +372,7 @@ async def live_start(interface: str = "en0", window_seconds: int = 30):
 
         # Blocking capture + pipeline, executed in a worker thread
         def _sniff_and_run():
-            # ⚠ pyshark needs an event loop in this thread; add asyncio.set_event_loop(asyncio.new_event_loop()) first
+            # WARNING pyshark needs an event loop in this thread; add asyncio.set_event_loop(asyncio.new_event_loop()) first
             # tshark writes captured packets to the temp PCAP
             cap = pyshark.LiveCapture(interface=interface, output_file=_live_pcap)
             # Block for window_seconds while capturing
@@ -389,7 +389,7 @@ async def live_start(interface: str = "en0", window_seconds: int = 30):
         except Exception as e:
             # Stash the error so /live/stop can report it
             _live_result = [{"error": str(e)}]
-        # ⚠ On cancel this runs immediately while the worker thread is still sniffing/writing
+        # WARNING On cancel this runs immediately while the worker thread is still sniffing/writing
         finally:
             # Clean up the temp PCAP
             if os.path.exists(_live_pcap):
@@ -410,13 +410,13 @@ async def live_stop():
     Cancel the live capture (if still running) and return whatever flows
     have been classified so far.
     """
-    # ⚠ Docstring overpromises: classification only happens after the full window, so stopping early returns nothing
+    # WARNING Docstring overpromises: classification only happens after the full window, so stopping early returns nothing
     # We reassign these module-level variables
     global _live_task, _live_result
 
     # Capture still running
     if _live_task and not _live_task.done():
-        # Cancel the asyncio task (⚠ cancels the await, not the worker thread — tshark keeps running)
+        # Cancel the asyncio task (WARNING cancels the await, not the worker thread, tshark keeps running)
         _live_task.cancel()
         try:
             # Wait for the task to acknowledge cancellation
@@ -442,7 +442,7 @@ async def live_stop():
 
     return {
         "status":  "stopped",
-        # ⚠ KeyError on the {"error": ...} record → 500
+        # WARNING KeyError on the {"error": ...} record → 500
         "summary": _alert_summary(result),
         "flows":   result,
     }
@@ -454,7 +454,7 @@ async def live_status():
     # True only if a task exists and hasn't finished
     running = bool(_live_task and not _live_task.done())
     return {
-        "running":      running,
+        "running": running,
         # Finished results waiting to be collected via /live/stop
         "has_results":  _live_result is not None,
         # Number of result records (an error record counts as 1)
