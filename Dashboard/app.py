@@ -1,5 +1,5 @@
 """
-Phase 11 — Streamlit dashboard
+Streamlit dashboard
 
 Panels:
   - PCAP Upload      — upload file → POST /predict → show results
@@ -21,25 +21,25 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 API_BASE = "http://localhost:8001"
-
+#Sets the colors in The SIEM for threat level
 TIER_COLORS = {
     "HIGH":   "#ff6b6b",
     "MEDIUM": "#ffd43b",
     "LOW":    "#69db7c",
 }
-
+#Sets the colors for the attack type
 ATTACK_PALETTE = [
     "#4fc3f7", "#ff6b6b", "#69db7c", "#ffd43b",
     "#da77f2", "#ff922b", "#74c0fc", "#f06595",
 ]
 
-# ── page config ───────────────────────────────────────────────────────────────
+# page configuration
 st.set_page_config(
     page_title="IDS — Intrusion Detection Dashboard",
     page_icon="🛡️",
     layout="wide",
 )
-
+#streamlit markdown for each tier
 st.markdown("""
 <style>
   .block-container { padding-top: 1.5rem; }
@@ -51,11 +51,12 @@ st.markdown("""
                  border-radius:4px; padding:2px 8px; font-weight:700; }
 </style>
 """, unsafe_allow_html=True)
-
-st.title("🛡️ Network Intrusion Detection System")
+#streamlit title
+st.title("🛡️ Network Intrusion Detection System")  
+#streamlit caption
 st.caption("Behavioral flow-level classification — upload a PCAP or monitor live traffic.")
 
-# ── sidebar ───────────────────────────────────────────────────────────────────
+#sidebar 
 with st.sidebar:
     st.header("⚙️ Settings")
     api_base = st.text_input("API URL", value=API_BASE)
@@ -71,7 +72,7 @@ with st.sidebar:
     interface      = st.text_input("Network interface", value="en0")
     window_seconds = st.number_input("Rolling window (s)", 10, 300, 30)
 
-# ── helper ────────────────────────────────────────────────────────────────────
+# helper
 
 def post(endpoint: str, **kwargs) -> dict | None:
     try:
@@ -87,9 +88,9 @@ def post(endpoint: str, **kwargs) -> dict | None:
 
 def get(endpoint: str) -> dict | None:
     try:
-        r = requests.get(f"{api_base}{endpoint}", timeout=10)
+        r = requests.get(f"{api_base}{endpoint}", timeout=10) #get requests from API base for the endpoint
         r.raise_for_status()
-        return r.json()
+        return r.json()  
     except requests.exceptions.ConnectionError:
         st.error("Cannot reach API.")
     except requests.exceptions.HTTPError as e:
@@ -98,24 +99,24 @@ def get(endpoint: str) -> dict | None:
 
 
 def render_results(data: dict):
-    """Render summary metrics, flow table, and charts from an API response."""
-    summary = data.get("summary", {})
-    flows   = data.get("flows", [])
-
+    """Make summary metrics, flow table, and charts from an API response."""
+    summary = data.get("summary", {}) # get the data summary
+    flows = data.get("flows", []) #get the data flows
+    # If there is nothing there don't return anything
     if not flows:
         st.warning("No flows returned.")
         return
 
-    # ── metric row ────────────────────────────────────────────────────────────
+    # metric row for the flows and the alert tiers
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total flows",  summary.get("total_flows", len(flows)))
-    col2.metric("🔴 HIGH",      summary.get("HIGH",   0))
-    col3.metric("🟡 MEDIUM",    summary.get("MEDIUM", 0))
-    col4.metric("🟢 LOW",       summary.get("LOW",    0))
+    col2.metric("🔴 HIGH", summary.get("HIGH",0))
+    col3.metric("🟡 MEDIUM", summary.get("MEDIUM",0))
+    col4.metric("🟢 LOW", summary.get("LOW",0))
 
     df = pd.DataFrame(flows)
 
-    # ── charts ────────────────────────────────────────────────────────────────
+    # charts
     chart_col, pie_col = st.columns(2)
 
     with chart_col:
@@ -143,7 +144,7 @@ def render_results(data: dict):
         fig2.update_layout(margin=dict(t=20))
         st.plotly_chart(fig2, use_container_width=True)
 
-    # ── attack score timeline ─────────────────────────────────────────────────
+    # attack score timeline
     st.subheader("Attack Score per Flow")
     df["flow_id"] = range(len(df))
     fig3 = go.Figure()
@@ -252,8 +253,8 @@ with tab_live:
             status = get("/live/status")
             if status:
                 running = status.get("running", False)
-                count   = status.get("result_count", 0)
-                msg     = "🟢 Running" if running else "⚪ Idle"
+                count = status.get("result_count", 0)
+                msg = "🟢 Running" if running else "⚪ Idle"
                 status_placeholder.info(
                     f"**Live capture:** {msg}  |  Flows ready: {count}"
                 )
