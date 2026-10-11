@@ -72,34 +72,40 @@ with st.sidebar:
     interface      = st.text_input("Network interface", value="en0")
     window_seconds = st.number_input("Rolling window (s)", 10, 300, 30)
 
-# helper
 
+#posts the requests of the API base and endpoints and takes any keywords to return a json file 
 def post(endpoint: str, **kwargs) -> dict | None:
     try:
+        #times out after 5 min  
         r = requests.post(f"{api_base}{endpoint}", timeout=300, **kwargs)
         r.raise_for_status()
-        return r.json()
+        return r.json() 
+    #lets us know that the API cannot be reached 
     except requests.exceptions.ConnectionError:
-        st.error("Cannot reach API. Is `uvicorn api.main:app` running?")
+        st.error("Cannot reach API. Is `uvicorn api.main:app` running?") 
+    #API took too long to respond
     except requests.exceptions.HTTPError as e:
         st.error(f"API error {e.response.status_code}: {e.response.text}")
     return None
 
-
+#gets endpoint of API and returns it as a dictionary
 def get(endpoint: str) -> dict | None:
     try:
-        r = requests.get(f"{api_base}{endpoint}", timeout=10) #get requests from API base for the endpoint
+        #sends get request to the API only for 10 sec
+        r = requests.get(f"{api_base}{endpoint}", timeout=10) 
+        #raises HTTPError if API returned an error
         r.raise_for_status()
-        return r.json()  
+        return r.json()   
+    #API cannot be reached
     except requests.exceptions.ConnectionError:
-        st.error("Cannot reach API.")
+        st.error("Cannot reach API.") 
+    #API has an error status
     except requests.exceptions.HTTPError as e:
         st.error(f"API error {e.response.status_code}: {e.response.text}")
     return None
 
-
-def render_results(data: dict):
-    """Make summary metrics, flow table, and charts from an API response."""
+"""Makes summary metrics, flow table, and charts from an API response."""
+def render_results(data: dict): 
     summary = data.get("summary", {}) # get the data summary
     flows = data.get("flows", []) #get the data flows
     # If there is nothing there don't return anything
@@ -173,7 +179,7 @@ def render_results(data: dict):
     )
     st.plotly_chart(fig3, use_container_width=True)
 
-    # ── flow table ────────────────────────────────────────────────────────────
+    # flow table 
     st.subheader("Flow-Level Predictions")
     display_cols = ["flow_id", "attack_score", "pred_label", "alert_tier", "action"]
     display_cols = [c for c in display_cols if c in df.columns]
@@ -190,10 +196,10 @@ def render_results(data: dict):
     )
 
 
-# ── tab layout ────────────────────────────────────────────────────────────────
+#tab layout
 tab_upload, tab_live = st.tabs(["📁 PCAP Upload", "📡 Live Capture"])
 
-# ── UPLOAD TAB ────────────────────────────────────────────────────────────────
+# UPLOAD TAB
 with tab_upload:
     st.subheader("Upload a PCAP for forensic analysis")
     st.caption(
@@ -214,7 +220,7 @@ with tab_upload:
                 st.success(f"Analysis complete — {result['summary']['total_flows']} flows classified.")
                 render_results(result)
 
-# ── LIVE TAB ──────────────────────────────────────────────────────────────────
+#LIVE TAB
 with tab_live:
     st.subheader("Real-time behavioral monitoring")
     st.caption(
@@ -247,7 +253,7 @@ with tab_live:
             elif res:
                 st.info("Capture stopped — no flows to classify yet.")
 
-    # ── auto-refresh status ───────────────────────────────────────────────────
+    #auto-refresh status
     if st.checkbox("Auto-refresh status every 5s", value=False):
         while True:
             status = get("/live/status")
