@@ -264,7 +264,7 @@ async def predict(file: UploadFile = File(...)):
         records = await asyncio.to_thread(_run_pipeline, pcap_path)
     # CICFlowMeter missing
     except RuntimeError as e:
-        # CICFlowMeter not installed — return a clear message instead of 500
+        # CICFlowMeter not installed, return a clear message instead of 500
         raise HTTPException(503, str(e))
     # Data parsed but unusable (e.g., zero flows)
     except ValueError as e:
@@ -287,7 +287,7 @@ async def predict(file: UploadFile = File(...)):
     })
 
 
-# POST /predict/flows — CSV path that skips CICFlowMeter
+# POST /predict/flows CSV path that skips CICFlowMeter
 @app.post("/predict/flows")
 # Named *_endpoint so it doesn't shadow the imported predict_flows function
 async def predict_flows_endpoint(file: UploadFile = File(...)):
@@ -336,7 +336,7 @@ async def predict_flows_endpoint(file: UploadFile = File(...)):
     })
 
 
-# POST /live/start — begin capturing from a network interface
+# POST /live/start begins capturing from a network interface
 @app.post("/live/start")
 # Non-file params on a POST become query params (?interface=eth0&window_seconds=60); en0 is the macOS default
 async def live_start(interface: str = "en0", window_seconds: int = 30):
@@ -403,7 +403,7 @@ async def live_start(interface: str = "en0", window_seconds: int = 30):
     return {"status": "started", "interface": interface, "window_seconds": window_seconds}
 
 
-# POST /live/stop — end capture and collect results
+# POST /live/stop ends capture and collect results
 @app.post("/live/stop")
 async def live_stop():
     """
@@ -448,7 +448,7 @@ async def live_stop():
     }
 
 
-# GET /live/status — poll capture state without stopping it
+# GET /live/status poll capture state without stopping it
 @app.get("/live/status")
 async def live_status():
     # True only if a task exists and hasn't finished
