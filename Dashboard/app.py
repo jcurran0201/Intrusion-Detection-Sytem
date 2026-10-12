@@ -2,11 +2,11 @@
 Streamlit dashboard
 
 Panels:
-  - PCAP Upload      — upload file → POST /predict → show results
-  - Live Capture     — start / stop live monitoring → poll /live/status
-  - Flow Table       — per-flow predictions with color-coded alert tier badges
-  - Distribution     — attack class bar chart
-  - Alert Tier Pie   — HIGH / MEDIUM / LOW breakdown
+  - PCAP Upload      upload file → POST /predict → show results
+  - Live Capture     start / stop live monitoring → poll /live/status
+  - Flow Table       per-flow predictions with color-coded alert tier badges
+  - Distribution     attack class bar chart
+  - Alert Tier Pie   HIGH / MEDIUM / LOW breakdown
 
 Run:
   streamlit run dashboard/app.py
@@ -21,7 +21,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 API_BASE = "http://localhost:8001"
-#Sets the colors in The SIEM for threat level
+#Sets the colors for each alert tier
 TIER_COLORS = {
     "HIGH":   "#ff6b6b",
     "MEDIUM": "#ffd43b",
@@ -39,7 +39,7 @@ st.set_page_config(
     page_icon="🛡️",
     layout="wide",
 )
-#streamlit markdown for each tier
+# CSS badge styles per tier 
 st.markdown("""
 <style>
   .block-container { padding-top: 1.5rem; }
@@ -72,8 +72,7 @@ with st.sidebar:
     interface      = st.text_input("Network interface", value="en0")
     window_seconds = st.number_input("Rolling window (s)", 10, 300, 30)
 
-
-#posts the requests of the API base and endpoints and takes any keywords to return a json file 
+#POST to the API; extra kwargs (files, params) go to requests. Returns JSON dict or None on error
 def post(endpoint: str, **kwargs) -> dict | None:
     try:
         #times out after 5 min  
@@ -83,7 +82,7 @@ def post(endpoint: str, **kwargs) -> dict | None:
     #lets us know that the API cannot be reached 
     except requests.exceptions.ConnectionError:
         st.error("Cannot reach API. Is `uvicorn api.main:app` running?") 
-    #API took too long to respond
+    #API responded w/ an error status
     except requests.exceptions.HTTPError as e:
         st.error(f"API error {e.response.status_code}: {e.response.text}")
     return None
@@ -108,7 +107,7 @@ def get(endpoint: str) -> dict | None:
 def render_results(data: dict): 
     summary = data.get("summary", {}) # get the data summary
     flows = data.get("flows", []) #get the data flows
-    # If there is nothing there don't return anything
+    # If there isnt a flow it tells you
     if not flows:
         st.warning("No flows returned.")
         return
@@ -126,9 +125,10 @@ def render_results(data: dict):
     chart_col, pie_col = st.columns(2)
 
     with chart_col:
-        st.subheader("Attack Class Distribution")
-        class_counts = df["pred_label"].value_counts().reset_index()
-        class_counts.columns = ["Attack Class", "Count"]
+        st.subheader("Attack Class Distribution") #chart subhearder in streamlit
+        class_counts = df["pred_label"].value_counts().reset_index() #value count for each label
+        class_counts.columns = ["Attack Class", "Count"] #renames the two columns that value_counts().reset_index() already produced
+        #creates a barchart
         fig = px.bar(
             class_counts, x="Attack Class", y="Count",
             color="Attack Class", color_discrete_sequence=ATTACK_PALETTE,
@@ -136,7 +136,8 @@ def render_results(data: dict):
         )
         fig.update_layout(showlegend=False, margin=dict(t=20, b=40))
         st.plotly_chart(fig, use_container_width=True)
-
+      
+    #pie chart that shows the flow data very simialr to the with chart_col
     with pie_col:
         st.subheader("Alert Tier Breakdown")
         tier_counts = df["alert_tier"].value_counts().reset_index()
@@ -150,10 +151,11 @@ def render_results(data: dict):
         fig2.update_layout(margin=dict(t=20))
         st.plotly_chart(fig2, use_container_width=True)
 
-    # attack score timeline
+    #Attack score per flow
     st.subheader("Attack Score per Flow")
-    df["flow_id"] = range(len(df))
-    fig3 = go.Figure()
+    df["flow_id"] = range(len(df))  #Number each flow 0..n-1 to use as the scatter x-axis and table ID
+    fig3 = go.Figure() #creates a figure 
+    # add_trace creates a scatterplot out of fig3
     fig3.add_trace(go.Scatter(
         x=df["flow_id"], y=df["attack_score"],
         mode="markers",
@@ -181,9 +183,9 @@ def render_results(data: dict):
 
     # flow table 
     st.subheader("Flow-Level Predictions")
-    display_cols = ["flow_id", "attack_score", "pred_label", "alert_tier", "action"]
-    display_cols = [c for c in display_cols if c in df.columns]
-
+    display_cols = ["flow_id", "attack_score", "pred_label", "alert_tier", "action"] #cols in the flow table
+    display_cols = [c for c in display_cols if c in df.columns] #keep only the cols that exist in the response
+    #Flow table, each row colored by its alert tier
     st.dataframe(
         df[display_cols].style.apply(
             lambda row: [
