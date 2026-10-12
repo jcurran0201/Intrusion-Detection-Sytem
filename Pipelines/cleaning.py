@@ -1,5 +1,5 @@
 """
-Phase 4 — cleaning.py
+Phase 4 cleaning.py
 Normalize CICFlowMeter CSV output so it matches the training feature spec exactly.
 Without this, predictions are silently wrong.
 
@@ -18,7 +18,7 @@ import pandas as pd
 def clean_cicflow_output(df: pd.DataFrame, features_path: str) -> pd.DataFrame:
     """
     Args:
-      df            — raw CICFlowMeter output DataFrame
+      df — raw CICFlowMeter output DataFrame
       features_path — path to artifacts/features.json
 
     Returns:
@@ -28,21 +28,21 @@ def clean_cicflow_output(df: pd.DataFrame, features_path: str) -> pd.DataFrame:
     Raises:
       ValueError if any expected feature column is missing.
     """
-    # 1. normalize column names to match training data
-    df = df.copy()
-    df.columns = df.columns.str.strip()
+    # normalize column names to match training data
+    df = df.copy() # work on a copy so the caller's DataFrame isn't modified
+    df.columns = df.columns.str.strip() #strip out any unnecessary spaces
 
-    # 2. kill Infinity / NaN — model was trained on cleaned data
-    df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
+    # kill Infinity / NaN. model was trained on cleaned data
+    df = df.replace([np.inf, -np.inf], np.nan).fillna(0) 
 
-    # 3. load expected feature list
+    # load expected feature list
     with open(features_path) as f:
         expected: list[str] = json.load(f)
 
-    # 4. fail loudly if columns are missing — silent misalignment is worse
+    # fail loudly if columns are missing — silent misalignment is worse
     missing = [col for col in expected if col not in df.columns]
     if missing:
-        available = sorted(df.columns.tolist())
+        available = sorted(df.columns.tolist()) #sorts the cols into an Alphabetical list 
         raise ValueError(
             f"CICFlowMeter output is missing {len(missing)} expected feature(s):\n"
             f"  {missing}\n"
