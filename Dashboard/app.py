@@ -63,13 +63,13 @@ with st.sidebar:
     st.divider()
 
     st.subheader("🎯 Alert Thresholds")
-    high_thresh   = st.slider("HIGH threshold",   0.50, 1.0, 0.85, 0.01)
+    high_thresh = st.slider("HIGH threshold",   0.50, 1.0, 0.85, 0.01)
     medium_thresh = st.slider("MEDIUM threshold", 0.10, 0.85, 0.50, 0.01)
     st.caption("Thresholds shown here are for display only — the model uses fixed tiers.")
     st.divider()
 
     st.subheader("📡 Live Capture")
-    interface      = st.text_input("Network interface", value="en0")
+    interface = st.text_input("Network interface", value="en0")
     window_seconds = st.number_input("Rolling window (s)", 10, 300, 30)
 
 #POST to the API; extra kwargs (files, params) go to requests. Returns JSON dict or None on error
@@ -201,28 +201,35 @@ def render_results(data: dict):
 #tab layout
 tab_upload, tab_live = st.tabs(["📁 PCAP Upload", "📡 Live Capture"])
 
-# UPLOAD TAB
+# Upload tab
 with tab_upload:
-    st.subheader("Upload a PCAP for forensic analysis")
+  #subheader tells you to upload the file
+    st.subheader("Upload a PCAP for forensic analysis") 
     st.caption(
         "Upload a .pcap or .pcapng file. "
         "CICFlowMeter extracts flow features → model classifies each flow."
     )
-
+      # File picker; returns the uploaded file, or None until one is chosen
     uploaded = st.file_uploader("Choose a PCAP file", type=["pcap", "pcapng"])
 
+    # Only show the Analyze button once a file has been chosen
     if uploaded:
+        # Creates a button to analyze the pcap file
         if st.button("🔍 Analyze", key="btn_analyze"):
+            # Loading spinner while the API runs the pipeline
             with st.spinner("Running pipeline (pyshark → CICFlowMeter → model)…"):
+                # Send the PCAP bytes to the API's /predict endpoint as a file upload;
+                # returns {"summary", "flows"} on success or None on error
                 result = post(
                     "/predict",
                     files={"file": (uploaded.name, uploaded.getvalue(), "application/octet-stream")},
                 )
+            # Analysis succeeded (API returned data), so show the results
             if result:
                 st.success(f"Analysis complete — {result['summary']['total_flows']} flows classified.")
                 render_results(result)
 
-#LIVE TAB
+#Live tab
 with tab_live:
     st.subheader("Real-time behavioral monitoring")
     st.caption(
@@ -230,14 +237,17 @@ with tab_live:
         "dumps to temp PCAP → runs full pipeline. "
         "Model classifies behavioral anomalies across completed flows every ~30s."
     )
-
-    status_placeholder = st.empty()
+    #Slot for the live-capture status line, overwritten on each refresh
+    status_placeholder = st.empty() 
+    #placeholder for the actual results of the flow data
     results_placeholder = st.empty()
 
     col_start, col_stop = st.columns(2)
-
-    with col_start:
-        if st.button("▶️ Start Live Capture", key="btn_start"):
+    #starts the live capture
+    with col_start: 
+        #creates a button to start the live capture
+        if st.button("▶️ Start Live Capture", key="btn_start"): 
+          # Ask the API to start capturing on this interface; settings go as query params
             res = post(
                 "/live/start",
                 params={"interface": interface, "window_seconds": window_seconds},
@@ -245,17 +255,24 @@ with tab_live:
             if res:
                 st.success(f"Capture started on `{interface}` — {window_seconds}s window.")
 
+        # Right column: stop button
     with col_stop:
+        # Stop the capture and classify what was collected
         if st.button("⏹ Stop & Classify", key="btn_stop"):
+            # Spinner while the API stops capturing and runs the pipeline
             with st.spinner("Stopping capture and running classification…"):
                 res = post("/live/stop")
+            # API returned flows, so show the results
             if res and res.get("flows"):
                 st.success("Live capture results:")
                 render_results(res)
+            # API responded but the capture had no completed flows
             elif res:
                 st.info("Capture stopped — no flows to classify yet.")
 
-    #auto-refresh status
+    # Auto-refresh: while checked, poll /live/status every 5s.
+    # st.rerun() restarts the script, so this effectively runs once per rerun,
+    # and the still-checked box starts it again on the next pass.
     if st.checkbox("Auto-refresh status every 5s", value=False):
         while True:
             status = get("/live/status")
@@ -263,9 +280,11 @@ with tab_live:
                 running = status.get("running", False)
                 count = status.get("result_count", 0)
                 msg = "🟢 Running" if running else "⚪ Idle"
+                # Overwrite the status line in place instead of stacking new messages
                 status_placeholder.info(
                     f"**Live capture:** {msg}  |  Flows ready: {count}"
                 )
+                # Capture finished with flows waiting: fetch them, show them, stop polling
                 if not running and count > 0:
                     res = post("/live/stop")
                     if res:
@@ -273,4 +292,4 @@ with tab_live:
                             render_results(res)
                     break
             time.sleep(5)
-            st.rerun()
+            st.rerun()  # restart the script so the next poll happens
