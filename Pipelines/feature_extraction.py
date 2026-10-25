@@ -58,7 +58,7 @@ RENAME_MAP = {
     "bwd_pkt_len_max":    "Bwd Packet Length Max",
     "bwd_pkt_len_mean":   "Bwd Packet Length Mean",
 }
-
+#tiny number added to a denominator so you never divide by exactly zero in case there is no denomiator in def _add_engineered_ratios
 _EPS = 1e-6
 
 
@@ -77,55 +77,61 @@ def extract_flows(pcap_path: str, timeout: float = 60.0) -> pd.DataFrame:
     feature naming convention, and add engineered ratio features.
 
     Args:
-      pcap_path — path to a .pcap/.pcapng file
-      timeout   — max seconds to wait for flow extraction to complete
+      pcap_path— path to a .pcap/.pcapng file
+      timeout— max seconds to wait for flow extraction to complete
 
     Returns:
       DataFrame of flow-level features, columns named to match features.json
 
     Raises:
-      RuntimeError — cicflowmeter itself failed to run
-      ValueError   — no flows were extracted from the PCAP
+      RuntimeError— cicflowmeter itself failed to run
+      ValueError— no flows were extracted from the PCAP
     """
-    tmp_csv = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
-    tmp_csv.close()
-    csv_path = tmp_csv.name
+    #create an empty temp .csv for cicflowmeter to write flows into. delete=False keeps it after closing
+    tmp_csv = tempfile.NamedTemporaryFile(suffix=".csv", delete=False) 
+    # release handle so cicflowmeter can open and write to the file 
+    tmp_csv.close() 
+    # grab the temp file's path to pass to the sniffer
+    csv_path = tmp_csv.name #creates the file path
 
     try:
+        #start a sniffer session
         sniffer, session = create_sniffer(
-            input_file=pcap_path,
+            input_file=pcap_path, #input the pcap_file
             input_interface=None,
-            output_mode="csv",
-            output=csv_path,
+            output_mode="csv", #output is a csv file
+            output=csv_path, #output is csv_path so it can be put into the model
             fields=None,
             verbose=False,
         )
-        sniffer.start()
+        sniffer.start() #start the sniffer
         sniffer.join(timeout=timeout)
 
-        # stop the periodic GC thread cicflowmeter spins up internally
-        if hasattr(session, "_gc_stop"):
-            session._gc_stop.set()
-            session._gc_thread.join(timeout=2.0)
+        # stop the periodic Garbage Collection thread cicflowmeter spins up internally
+        if hasattr(session, "_gc_stop"): 
+            session._gc_stop.set() #set the garbage collection to stop 
+            session._gc_thread.join(timeout=2.0) #? 
 
-        session.flush_flows()
-
+        session.flush_flows() #? 
+        #if the OS path does not exist or there is no data the raise a value error
         if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
             raise ValueError(f"cicflowmeter produced no output for {pcap_path}")
 
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path) 
+    # exception for a ValueError 
     except ValueError:
-        raise
+        raise # and we raise a RuntimeError underneath 
     except Exception as e:
-        raise RuntimeError(f"cicflowmeter extraction failed: {e}") from e
+        raise RuntimeError(f"cicflowmeter extraction failed: {e}") from e 
+    #Finally if the path exists we delete the path with os.unlink
     finally:
         if os.path.exists(csv_path):
             os.unlink(csv_path)
-
+    #if there is nothing in the df we raise a value error
     if df.empty:
         raise ValueError(f"cicflowmeter returned 0 flows for {pcap_path}")
-
+    #rename the columns and run the _add_engineered_ratios function
     df = df.rename(columns=RENAME_MAP)
     df = _add_engineered_ratios(df)
 
-    return df
+    return df #return the df
