@@ -98,36 +98,39 @@ def extract_flows(pcap_path: str, timeout: float = 60.0) -> pd.DataFrame:
         #start a sniffer session
         sniffer, session = create_sniffer(
             input_file=pcap_path, #input the pcap_file
-            input_interface=None,
+            input_interface=None, # no live network capture
             output_mode="csv", #output is a csv file
             output=csv_path, #output is csv_path so it can be put into the model
-            fields=None,
-            verbose=False,
+            fields=None, # keep all flow features
+            verbose=False, # no per-packet logging
         )
-        sniffer.start() #start the sniffer
-        sniffer.join(timeout=timeout)
+        sniffer.start() #start reading packets in a background thread
+        sniffer.join(timeout=timeout) # wait for it to finish reading the PCAP, up to `timeout` seconds
 
-        # stop the periodic Garbage Collection thread cicflowmeter spins up internally
+        # stop cicflowmeter's internal garbage-collection thread (expires idle flows on a timer)
+        # hasattr guard: these are private attributes and may not exist in every cicflowmeter version
         if hasattr(session, "_gc_stop"): 
             session._gc_stop.set() #set the garbage collection to stop 
-            session._gc_thread.join(timeout=2.0) #? 
-
-        session.flush_flows() #? 
-        #if the OS path does not exist or there is no data the raise a value error
+            session._gc_thread.join(timeout=2.0) # wait up to 2s for it to actually exit 
+            
+        #write out every flow still open when the PCAP ended; otherwise those rows are lost
+        session.flush_flows() 
+        #if the OS path does not exist or there is no data the raise a value error bc cicflowmeter wrote nothing
         if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
             raise ValueError(f"cicflowmeter produced no output for {pcap_path}")
 
         df = pd.read_csv(csv_path) 
-    # exception for a ValueError 
+    # re-raise our own ValueError unchanged so the clause below doesn't wrap it
     except ValueError:
-        raise # and we raise a RuntimeError underneath 
+        raise 
+    # any other failure inside cicflowmeter gets wrapped as a RuntimeError, keeping the original error attached
     except Exception as e:
         raise RuntimeError(f"cicflowmeter extraction failed: {e}") from e 
-    #Finally if the path exists we delete the path with os.unlink
+    #always delete the temp CSV, whether extraction succeeded or failed
     finally:
         if os.path.exists(csv_path):
             os.unlink(csv_path)
-    #if there is nothing in the df we raise a value error
+    #if there are no values in the df we raise a value error
     if df.empty:
         raise ValueError(f"cicflowmeter returned 0 flows for {pcap_path}")
     #rename the columns and run the _add_engineered_ratios function
