@@ -30,7 +30,7 @@ def clean_cicflow_output(df: pd.DataFrame, features_path: str) -> pd.DataFrame:
     """
     # normalize column names to match training data
     df = df.copy() # work on a copy so the caller's DataFrame isn't modified
-    df.columns = df.columns.str.strip() #strip out any unnecessary spaces
+    df.columns = df.columns.str.strip() #strip out any unnecessary spaces at the start and end 
 
     # kill Infinity / NaN. model was trained on cleaned data
     df = df.replace([np.inf, -np.inf], np.nan).fillna(0) 
@@ -40,7 +40,7 @@ def clean_cicflow_output(df: pd.DataFrame, features_path: str) -> pd.DataFrame:
         expected: list[str] = json.load(f)
 
     # fail loudly if columns are missing — silent misalignment is worse
-    missing = [col for col in expected if col not in df.columns]
+    missing = [col for col in expected if col not in df.columns] # establishes our mising columns
     if missing:
         available = sorted(df.columns.tolist()) #sorts the cols into an Alphabetical list 
         raise ValueError(
