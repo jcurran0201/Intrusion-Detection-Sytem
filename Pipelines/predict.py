@@ -17,10 +17,10 @@ import joblib
 
 from pipeline.custom_transformers import CappedSMOTE
 
-BASE          = os.path.join(os.path.dirname(__file__), "..", "artifacts")
-MODEL_PATH    = os.path.join(BASE, "model.pkl")
+BASE = os.path.join(os.path.dirname(__file__), "..", "artifacts")
+MODEL_PATH = os.path.join(BASE, "model.pkl")
 FEATURES_PATH = os.path.join(BASE, "features.json")
-LABELS_PATH   = os.path.join(BASE, "label_map.json")
+LABELS_PATH = os.path.join(BASE, "label_map.json")
 
 
 @functools.lru_cache(maxsize=1)
@@ -47,25 +47,25 @@ def predict_flows(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
       df with four new columns appended:
         attack_score  float  P(not benign)
-        pred_label    str    predicted attack class name
-        alert_tier    str    HIGH / MEDIUM / LOW
-        action        str    recommended SOC action
+        pred_label str predicted attack class name
+        alert_tier str HIGH / MEDIUM / LOW
+        action str recommended SOC action
     """
-    model, features, label_map = _load_artifacts()
+    model, features, label_map = _load_artifacts() #we load the artifcats from the function above
 
-    X      = df[features].values
-    proba  = model.predict_proba(X)                  # shape (n, n_classes)
-    attack = 1.0 - proba[:, 0]                       # P(attack) = 1 - P(benign)
-    cls    = np.argmax(proba, axis=1)
+    X = df[features].values #grabs the vlaues of the features in the df
+    proba = model.predict_proba(X) # shape (n, n_classes)
+    attack = 1.0 - proba[:, 0] # P(attack) = 1 - P(benign)
+    cls = np.argmax(proba, axis=1)
 
-    out             = df.copy()
+    out = df.copy()
     out["attack_score"] = attack
-    out["pred_label"]   = [label_map[c] for c in cls]
-    out["alert_tier"]   = [_tier(s) for s in attack]
-    out["action"]       = [_action(s) for s in attack]
+    out["pred_label"] = [label_map[c] for c in cls]
+    out["alert_tier"] = [_tier(s) for s in attack]
+    out["action"] = [_action(s) for s in attack]
     return out
 
-
+#returns our tiers
 def _tier(score: float) -> str:
     if score >= 0.85:
         return "HIGH"
@@ -73,10 +73,10 @@ def _tier(score: float) -> str:
         return "MEDIUM"
     return "LOW"
 
-
+#How should we react based on the tier level
 def _action(score: float) -> str:
     if score >= 0.85:
-        return "ALERT   - Escalate immediately"
+        return "ALERT - Escalate immediately"
     elif score >= 0.50:
         return "MONITOR - Flag for review"
-    return "LOG     - Routine logging"
+    return "LOG - Routine logging"
