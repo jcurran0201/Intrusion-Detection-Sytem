@@ -16,13 +16,13 @@ def save_pcap_bytes(file_bytes: bytes) -> str:
     """
     tmp = tempfile.NamedTemporaryFile(suffix=".pcap", delete=False)
     try:
-        tmp.write(file_bytes)
-        tmp.flush()
-        tmp.close()
-        _validate(tmp.name)
+        tmp.write(file_bytes) #write pcap bytes into the file
+        tmp.flush() #Pushes data past Python's internal buffer
+        tmp.close() #close the file
+        _validate(tmp.name) #validate with the function below
     except Exception:
-        os.unlink(tmp.name)
-        raise
+        os.unlink(tmp.name) # don't leave invalid uploads sitting on disk
+        raise # re-raise the original error unchanged for the caller
     return tmp.name
 
 
@@ -31,8 +31,8 @@ def save_pcap_path(src_path: str) -> str:
     Copy an on-disk PCAP to a new temp file so downstream steps always work
     from a consistent path and the original file is never modified.
     """
-    with open(src_path, "rb") as f:
-        return save_pcap_bytes(f.read())
+    with open(src_path, "rb") as f: #read-only access in binary mode
+        return save_pcap_bytes(f.read()) # read the whole file as bytes, copy it into a validated temp .pcap, return the temp path
 
 
 def _validate(path: str) -> None:
@@ -42,11 +42,14 @@ def _validate(path: str) -> None:
     """
     cap = pyshark.FileCapture(path, keep_packets=False)
     try:
-        pkt = next(iter(cap))          # raises StopIteration if empty
-        _ = pkt.highest_layer          # access a field to force full parse
+        pkt = next(iter(cap)) # grab just the first packet; raises StopIteration if empty
+        _ = pkt.highest_layer # pyshark is lazy: touching a field forces tshark to fully parse it, so corrupt files fail here
+     # no packets at all: turn it into a clear "empty file" error
     except StopIteration:
         raise ValueError(f"PCAP at {path} contains no packets.")
+    # anything else (corrupt file, not a PCAP, tshark error): report as bad input, keeping the original error attached
     except Exception as e:
         raise ValueError(f"PCAP validation failed: {e}") from e
+    # always shut down the tshark process, pass or fail, so it doesn't leak on every upload
     finally:
         cap.close()
