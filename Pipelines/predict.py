@@ -32,8 +32,11 @@ def _load_artifacts():
     # __main__ to expose that name, or joblib.load() raises AttributeError.
     sys.modules["__main__"].CappedSMOTE = CappedSMOTE
     model = joblib.load(MODEL_PATH)
+  # Feature order matters: the model expects columns in exactly this order.
     with open(FEATURES_PATH) as f:
         features: list[str] = json.load(f)
+  # JSON object keys are always strings, so convert them back to integers
+    # to match the encoded class codes the model predicts.
     with open(LABELS_PATH) as f:
         label_map: dict[int, str] = {int(k): v for k, v in json.load(f).items()}
     return model, features, label_map
@@ -42,7 +45,7 @@ def _load_artifacts():
 def predict_flows(df: pd.DataFrame) -> pd.DataFrame:
     """
     Args:
-      df — DataFrame with the 20 model features (already cleaned + aligned).
+      df— DataFrame with the 20 model features (already cleaned + aligned).
 
     Returns:
       df with four new columns appended:
@@ -53,16 +56,23 @@ def predict_flows(df: pd.DataFrame) -> pd.DataFrame:
     """
     model, features, label_map = _load_artifacts() #we load the artifcats from the function above
 
-    X = df[features].values #grabs the vlaues of the features in the df
-    proba = model.predict_proba(X) # shape (n, n_classes)
+    X = df[features].values #Select the features in the order the model expects.
+    proba = model.predict_proba(X) # Class probabilities for each flow: shape (n_flows, n_classes).
+
+     # Overall attack likelihood. Assumes BENIGN is the first column of
+    # model.classes_ (encoded as 0).
     attack = 1.0 - proba[:, 0] # P(attack) = 1 - P(benign)
+
+   # Index of the single most probable class for each flow. Assumes class
+    # codes are contiguous 0..n-1, so the column index equals the class code.
     cls = np.argmax(proba, axis=1)
 
+    # Work on a copy so the caller's DataFrame isn't mutated.
     out = df.copy()
     out["attack_score"] = attack
-    out["pred_label"] = [label_map[c] for c in cls]
-    out["alert_tier"] = [_tier(s) for s in attack]
-    out["action"] = [_action(s) for s in attack]
+    out["pred_label"] = [label_map[c] for c in cls]   # code -> class name
+    out["alert_tier"] = [_tier(s) for s in attack]    # score -> HIGH/MEDIUM/LOW
+    out["action"] = [_action(s) for s in attack]      # score -> SOC action
     return out
 
 #returns our tiers
