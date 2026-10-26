@@ -1,6 +1,6 @@
 # ML-Based Intrusion Detection System
 
-An end-to-end machine learning pipeline for network intrusion detection, built on flow-level traffic features and integrated with an Elastic SIEM stack for alert visualization. The project takes raw packet captures through feature extraction, classification, and alert triage — the same shape as a real detection engineering pipeline, built at portfolio scale.
+An end-to-end machine learning pipeline for network intrusion detection, built on flow-level traffic features and integrated with an Elastic SIEM stack for alert visualization. The project takes raw packet captures through feature extraction, classification, and alert triage; the same shape as a real detection engineering pipeline, built at portfolio scale.
 
 ---
 
