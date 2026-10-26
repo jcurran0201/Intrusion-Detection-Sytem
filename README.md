@@ -197,19 +197,3 @@ Documented tradeoffs rather than oversights:
 - **Live auto-capture (`/live/start`) requires raw network interface access**, which is a further constraint on running it inside a container — separate from the flow-extraction question above.
 - **AWS ECS deployment is out of scope by design**, not a gap — this project targets a local, demoable deployment.
 
----
-
-## Roadmap
-
-- [x] Wire prediction output directly into Elasticsearch ingestion
-- [x] Get real PCAP-derived flows through the full pipeline into the dashboard
-- [ ] Finish remaining Kibana dashboard panels (attack class bar chart, attack score over time, HIGH-tier table — alert tier pie chart complete)
-- [ ] MITRE ATT&CK mapping table (attack classes → tactics/technique IDs)
-- [ ] Per-tier incident response playbook (analyst actions + SLAs for HIGH/MEDIUM/LOW)
-- [ ] Rule-vs-ML comparison for the DoS class (naive SYN-flood heuristic vs. RF on the same test split)
-
----
-
-## Stack
-
-Python · scikit-learn · imbalanced-learn (SMOTE) · SHAP · `cicflowmeter` (hieulw, Python) · pyshark · FastAPI · Elasticsearch · Kibana · Docker · Streamlit
