@@ -68,8 +68,8 @@ def add_engineered_ratios(df: pd.DataFrame) -> pd.DataFrame:
     # columns are a mix of renamed Title-Case and raw snake_case (the bwd totals aren't in RENAME_MAP),
     # so this must run AFTER the rename
     df["Fwd_Bwd_Bytes_Ratio"] = df["Total Length of Fwd Packet"] / (df["totlen_bwd_pkts"] + eps)  # forward bytes vs backward bytes
-    df["Fwd_Bwd_Packet_Ratio"] = df["Total Fwd Packet"] / (df["tot_bwd_pkts"] + eps)            # forward packets vs backward packets
-    df["Init_Win_Ratio"] = df["FWD Init Win Bytes"] / (df["Bwd Init Win Bytes"] + eps)          # initial TCP window size, client vs server
+    df["Fwd_Bwd_Packet_Ratio"] = df["Total Fwd Packet"] / (df["tot_bwd_pkts"] + eps) # forward packets vs backward packets
+    df["Init_Win_Ratio"] = df["FWD Init Win Bytes"] / (df["Bwd Init Win Bytes"] + eps) # initial TCP window size, client vs server
     return df
 
 
@@ -78,21 +78,21 @@ def pcap_to_raw_csv(pcap_path: str, csv_path: str, timeout: float = 30.0) -> Non
     own CLI's positional-argument bug)."""
     # build the sniffer (reads packets) and session (groups packets into flows, writes CSV rows)
     sniffer, session = create_sniffer(
-        input_file=pcap_path,    # read packets from the PCAP file
-        input_interface=None,    # no live network capture
-        output_mode="csv",       # write flows as CSV rows
-        output=csv_path,         # ...into this file
-        fields=None,             # keep all flow features
-        verbose=False,           # no per-packet logging
+        input_file=pcap_path, # read packets from the PCAP file
+        input_interface=None,# no live network capture
+        output_mode="csv",# write flows as CSV rows
+        output=csv_path, # ...into this file
+        fields=None, # keep all flow features
+        verbose=False, # no per-packet logging
     )
-    sniffer.start()                # start reading packets in a background thread
-    sniffer.join(timeout=timeout)  # wait for it to finish reading the PCAP, up to `timeout` seconds
+    sniffer.start() # start reading packets in a background thread
+    sniffer.join(timeout=timeout) # wait for it to finish reading the PCAP, up to `timeout` seconds
 
     # stop cicflowmeter's internal garbage-collection thread (expires idle flows on a timer)
     # hasattr guard: these are private attributes and may not exist in every cicflowmeter version
     if hasattr(session, "_gc_stop"):
-        session._gc_stop.set()                # signal the gc thread to stop
-        session._gc_thread.join(timeout=2.0)  # wait up to 2s for it to actually exit
+        session._gc_stop.set() # signal the gc thread to stop
+        session._gc_thread.join(timeout=2.0) # wait up to 2s for it to actually exit
 
     # write out every flow still open when the PCAP ended; otherwise those rows are lost
     session.flush_flows()
